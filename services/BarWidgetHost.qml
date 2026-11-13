@@ -8,8 +8,9 @@ import Quickshell.Wayland
 // in, so the widgets sit in a click-through strip along the top of the
 // screen: a panel opens just below the strip, centred, under the island.
 //
-// Which widgets: the third-party ones in the bar layout of shell.json. The
-// shell sends `omarchy-shell shell toggle <id>` to Island's summonBarWidget,
+// Which widgets: the third-party ones in the bar layout of shell.json. Their
+// icons are clickable in the island when hovered (the Plugins capsule, or the
+// Plugins glance slot), opening the panel under the icon. The shell sends `omarchy-shell shell toggle <id>` to Island's summonBarWidget,
 // hideBarWidget, and isBarWidgetOpen (see Island.qml), which land here.
 Item {
   id: hosts
@@ -29,7 +30,10 @@ Item {
         var meta = registry && id ? registry.metadataFor(id) : null
         if (!meta || meta.firstParty || seen[id]) return
         seen[id] = true
-        found.push({ id: id, settings: typeof entry === "object" ? entry : {} })
+        found.push({
+          id: id, settings: typeof entry === "object" ? entry : {},
+          name: String(meta.displayName || meta.name || id)
+        })
       })
     })
     return found
@@ -49,12 +53,42 @@ Item {
     for (var i = 0; i < entries.length; i++) if (entries[i].id === id) return true
     return false
   }
-  function summon(id) {
+  // Opens the widget's panel: centred under the island, or, given `x` (a
+  // screen x, as from an icon the island draws for it), under that point, the
+  // way the bar opens it under its button.
+  function summon(id, x) {
     var w = widget(id)
     if (!w || typeof w.open !== "function") return false
+    var slot = slotOf(id)
+    if (slot) slot.anchorX = x === undefined ? -1 : x
     w.open()
     return true
   }
+  // Opens it, or closes it when open: a click on its icon in the island.
+  function toggle(id, x) {
+    if (isOpen(id)) return hide(id)
+    return summon(id, x)
+  }
+  function slotOf(id) {
+    for (var i = 0; i < entries.length; i++)
+      if (entries[i].id === id) return repeater.itemAt(i)
+    return null
+  }
+  // The hosted widgets that open a panel, as { id, name }, in the bar
+  // layout's order: what the island offers to click (see HoverCapsules and
+  // GlanceBar). Reads `loadedCount`, so a binding on it follows the widgets
+  // as they load.
+  readonly property var openable: {
+    loadedCount
+    var found = []
+    for (var i = 0; i < entries.length; i++) {
+      var slot = repeater.itemAt(i)
+      var w = slot ? slot.item : null
+      if (w && typeof w.open === "function") found.push({ id: entries[i].id, name: entries[i].name })
+    }
+    return found
+  }
+  property int loadedCount: 0
   function hide(id) {
     var w = widget(id)
     if (!w || typeof w.close !== "function") return false
@@ -70,7 +104,7 @@ Item {
   // the plugin's icon. Reads `repeater.count`, so a binding on it follows the
   // widgets as they load.
   function iconOf(id) {
-    if (!repeater.count) return null
+    if (!repeater.count || !loadedCount) return null
     for (var i = 0; i < entries.length; i++)
       if (entries[i].id === id) {
         var slot = repeater.itemAt(i)
@@ -132,7 +166,8 @@ Item {
     anchors { top: true; left: true; right: true }
     WlrLayershell.namespace: "omarchy-island-widgets"
     WlrLayershell.layer: WlrLayer.Background
-    // No input: the widgets are only there to be opened by key or the Plugins view.
+    // No input: the widgets are only there to be opened from the island, by
+    // key, or from the Plugins view.
     mask: Region {}
 
     Repeater {
@@ -141,7 +176,10 @@ Item {
       delegate: Loader {
         id: slot
         required property var modelData
-        anchors.horizontalCenter: parent.horizontalCenter
+        // Where its panel opens: under `anchorX` on the screen (see summon),
+        // else centred. The panel lines itself up under the widget.
+        property real anchorX: -1
+        x: Math.max(0, Math.min(parent.width - width, anchorX >= 0 ? anchorX - width / 2 : (parent.width - width) / 2))
         opacity: 0
         sourceComponent: (hosts.host.barWidgetRegistry.widgets[modelData.id] || {}).component || null
         // The text that draws the widget's icon: the first visible one holding a
@@ -164,7 +202,7 @@ Item {
         Timer {
           id: retry
           interval: 1500
-          onTriggered: slot.glyph = slot.findGlyph(slot.item)
+          onTriggered: { slot.glyph = slot.findGlyph(slot.item); hosts.loadedCount++ }
         }
         onLoaded: {
           if ("bar" in item) item.bar = bar
@@ -172,6 +210,7 @@ Item {
           if ("settings" in item) item.settings = modelData.settings
           Qt.callLater(function() {
             slot.glyph = slot.item ? slot.findGlyph(slot.item) : null
+            hosts.loadedCount++
             if (!slot.glyph) retry.start()
           })
         }

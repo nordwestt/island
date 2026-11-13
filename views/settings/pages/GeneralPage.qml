@@ -134,6 +134,7 @@ ColumnLayout {
       case "weather": return "󰖐"
       case "media": return "󰝚"
       case "volume": return "󰕾"
+      case "plugins": return "󰐱"
       case "none": return "󰅖"
       default: return "󰜔"
       }
@@ -147,6 +148,7 @@ ColumnLayout {
       case "weather": return page.system.yellow
       case "media": return page.system.purple
       case "volume": return page.system.orange
+      case "plugins": return page.system.indigo
       case "none": return page.system.gray
       default: return page.system.blue
       }
@@ -159,6 +161,7 @@ ColumnLayout {
       { label: "󰖐  Weather", short: "Weather", value: "weather" },
       { label: "󰝚  Now Playing", short: "Now Playing", value: "media" },
       { label: "󰕾  Volume", short: "Volume", value: "volume" },
+      { label: "󰐱  Plugins", short: "Plugins", value: "plugins" },
       { label: "󰅖  None", short: "None", value: "none" }
     ]
 
@@ -281,6 +284,18 @@ ColumnLayout {
         view: page.view
         checked: page.view.settings.capsuleSystem !== false
         onToggled: function(on) { page.view.settings.capsuleSystem = on }
+      }
+    }
+    SettingsRow {
+      view: page.view
+      icon: "󰐱"
+      iconTint: page.system.indigo
+      label: "Plugins"
+      detail: "Other plugins' bar widgets, to open their panels"
+      SettingsSwitch {
+        view: page.view
+        checked: page.view.settings.capsulePlugins !== false
+        onToggled: function(on) { page.view.settings.capsulePlugins = on }
       }
     }
     SettingsRow {

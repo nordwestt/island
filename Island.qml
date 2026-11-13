@@ -193,6 +193,13 @@ Item {
     return barWidgetHost.summon(id)
   }
   function hideBarWidget(id) { return barWidgetHost.hide(id) }
+  // A click on a widget's icon in the island (see HoverCapsules, GlanceBar):
+  // opens its panel under the icon `from`, as the bar would under its
+  // button, or closes it if open.
+  function toggleBarWidget(id, from) {
+    var x = from ? from.mapToItem(null, from.width / 2, 0).x : undefined
+    return barWidgetHost.toggle(id, x)
+  }
   function isBarWidgetOpen(id) { return barWidgetHost.isOpen(id) }
 
   readonly property var addons: addonHost

@@ -9,6 +9,7 @@ import "../addons/weather"
 // - Clicking Network opens Wi-Fi settings.
 // - Clicking Volume or Battery opens Control Center.
 // - Clicking Workspace switches or shows workspace HUD.
+// - Clicking a Plugins icon opens that bar widget's panel under it.
 //
 // Guaranteed clock clearance: Left and right containers are strictly bounded
 // against a central exclusion reserve around the clock label, and variable-length
@@ -50,6 +51,10 @@ Item {
       }
       return Math.round(60 * scale)
     }
+    case "plugins": {
+      var count = Math.min(glanceBar.host.barWidgets.openable.length, glanceBar.maxPluginIcons)
+      return count ? Math.round((count * 16 + (count - 1) * 10) * scale) : 0
+    }
     case "media": {
       var title = (glanceBar.host.nowPlaying && glanceBar.host.nowPlaying.title) ? glanceBar.host.nowPlaying.title : ""
       if (!title) return Math.round(60 * scale)
@@ -84,6 +89,10 @@ Item {
     ? (sideMargin * 2 + Math.max(30, maxSideWidth) * 2 + Math.max(clockWidth, 60) + 48)
     : 0
 
+  // Plugins' bar widgets past this many don't fit beside the clock; the
+  // capsules, Plugins view and control center still reach them.
+  readonly property int maxPluginIcons: 5
+
   readonly property real sideMargin: glanceBar.host.settings.notch ? 18 : 16
 
   function componentFor(kind) {
@@ -94,6 +103,7 @@ Item {
     case "weather": return compWeather
     case "media": return compMedia
     case "volume": return compVolume
+    case "plugins": return glanceBar.host.barWidgets.openable.length ? compPlugins : null
     default: return null
     }
   }
@@ -419,6 +429,41 @@ Item {
         onClicked: function(mouse) {
           mouse.accepted = true
           glanceBar.host.view = "controls"
+        }
+      }
+    }
+  }
+
+  // Other plugins' bar widgets (see services/BarWidgetHost), by the icon
+  // each draws on Omarchy's bar; a click opens its panel under the icon.
+  Component {
+    id: compPlugins
+    Row {
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 10
+      Repeater {
+        model: glanceBar.host.barWidgets.openable.slice(0, glanceBar.maxPluginIcons)
+        delegate: Text {
+          id: pluginIcon
+          required property var modelData
+          readonly property var icon: glanceBar.host.barWidgets.iconOf(modelData.id)
+          anchors.verticalCenter: parent.verticalCenter
+          width: 16
+          horizontalAlignment: Text.AlignHCenter
+          text: icon ? icon.text : "󰐱"
+          color: glanceBar.host.barWidgets.isOpen(modelData.id) ? glanceBar.host.theme.accent : glanceBar.host.theme.text
+          font.family: icon && icon.family ? icon.family : glanceBar.host.theme.fontFamily
+          font.pixelSize: glanceBar.host.theme.px(13)
+          MouseArea {
+            anchors.fill: parent
+            anchors.margins: -5
+            cursorShape: Qt.PointingHandCursor
+            onClicked: function(mouse) {
+              mouse.accepted = true
+              glanceBar.host.toggleBarWidget(pluginIcon.modelData.id, pluginIcon)
+            }
+          }
+          Tooltip { theme: glanceBar.host.theme; text: pluginIcon.modelData.name }
         }
       }
     }

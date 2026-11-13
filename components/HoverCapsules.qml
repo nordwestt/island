@@ -10,7 +10,7 @@ import "../addons/weather"
 // Hovering the resting island splits what a bar shows into black capsules
 // beside it. Out from the island, the next event, tray apps with pending
 // Omarchy updates, workspaces and what's playing on the left; the weather, notifications,
-// and Bluetooth, network, sound and battery on the right. Each can be turned
+// Bluetooth, network, sound and battery, and other plugins' bar widgets on the right. Each can be turned
 // off in Settings, and one with nothing to show stays away. The connections,
 // sound and battery come from the control center's Controls, so both agree.
 Item {
@@ -102,6 +102,10 @@ Item {
   // --- Notifications: how many the history holds (Clear All empties it) ---
   readonly property int notificationCount: host.notifications.history.length
   readonly property bool showNotifications: settings.capsuleNotifications && notificationCount > 0
+
+  // --- Plugins: other plugins' bar widgets, by their icons (see BarWidgetHost) ---
+  readonly property var pluginWidgets: settings.capsulePlugins ? host.barWidgets.openable : []
+  readonly property bool showPlugins: pluginWidgets.length > 0
 
   // --- System: Bluetooth and battery only where there are any ---
   readonly property bool showSystem: settings.capsuleSystem
@@ -443,6 +447,7 @@ Item {
     }
 
     Capsule {
+      id: systemCapsule
       present: capsules.showSystem
       side: 1
       before: [weatherCapsule, notificationCapsule]
@@ -483,6 +488,26 @@ Item {
           implicitHeight: 12
         }
         TapHandler { onTapped: capsules.host.view = "controls" }
+      }
+    }
+
+    // A click opens the widget's panel under its icon, as on Omarchy's bar.
+    Capsule {
+      present: capsules.showPlugins
+      side: 1
+      before: [weatherCapsule, notificationCapsule, systemCapsule]
+      Repeater {
+        model: capsules.pluginWidgets
+        delegate: Glyph {
+          id: pluginGlyph
+          required property var modelData
+          readonly property var icon: capsules.host.barWidgets.iconOf(modelData.id)
+          text: icon ? icon.text : "󰐱"
+          font.family: icon && icon.family ? icon.family : capsules.theme.fontFamily
+          tint: capsules.host.barWidgets.isOpen(modelData.id) ? capsules.theme.accent : capsules.ink
+          onClicked: capsules.host.toggleBarWidget(modelData.id, pluginGlyph)
+          Tooltip { theme: capsules.theme; text: pluginGlyph.modelData.name }
+        }
       }
     }
   }
