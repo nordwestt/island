@@ -198,8 +198,17 @@ Item {
   // button, or closes it if open.
   function toggleBarWidget(id, from) {
     var x = from ? from.mapToItem(null, from.width / 2, 0).x : undefined
-    return barWidgetHost.toggle(id, x)
+    var done = barWidgetHost.toggle(id, x)
+    heldWidget = done && barWidgetHost.isOpen(id) ? id : ""
+    if (heldWidget === "" && done) Qt.callLater(function() { if (barWidgetHost.isOpen(id)) heldWidget = id })
+    return done
   }
+  // The widget whose panel was opened from the island: while it's open the
+  // island stays as it was, shown and expanded, rather than hiding or
+  // collapsing as the pointer moves into the panel.
+  property string heldWidget: ""
+  readonly property bool widgetPanelHeld: heldWidget !== "" && barWidgetHost.isOpen(heldWidget)
+  onWidgetPanelHeldChanged: if (!widgetPanelHeld) heldWidget = ""
   function isBarWidgetOpen(id) { return barWidgetHost.isOpen(id) }
 
   readonly property var addons: addonHost
@@ -603,7 +612,7 @@ Item {
         readonly property bool revealArmed: isEffectivelyHidden && !hasScreensaver
 
         readonly property bool islandHidden: isEffectivelyHidden
-          && !(revealArmed && edgeRevealed)
+          && !(revealArmed && edgeRevealed) && !root.widgetPanelHeld
 
         // Only the island takes input, except while a view is open: then the
         // whole screen does, so outsideArea can close it. While the island can
@@ -711,7 +720,7 @@ Item {
           Timer {
             id: glanceLeaveTimer
             interval: 180
-            onTriggered: island.glanceActive = false
+            onTriggered: if (!root.widgetPanelHeld) island.glanceActive = false
           }
           onGlanceHoveredChanged: {
             if (glanceHovered) {
@@ -727,7 +736,7 @@ Item {
           Timer {
             id: capsulesLeaveTimer
             interval: 180
-            onTriggered: island.capsulesActive = false
+            onTriggered: if (!root.widgetPanelHeld) island.capsulesActive = false
           }
           // A moment's pause before showing, like macOS's hover reveals, so
           // passing over the island doesn't flash the capsules.
@@ -746,6 +755,21 @@ Item {
             }
           }
 
+          // A panel opened from the island has closed: settle as the pointer
+          // now says, staying revealed and expanded only if it's on the island.
+          Connections {
+            target: root
+            function onWidgetPanelHeldChanged() {
+              if (root.widgetPanelHeld) return
+              if (islandPointerHover.hovered) {
+                window.edgeRevealed = true
+                return
+              }
+              if (!island.glanceHovered) glanceLeaveTimer.restart()
+              if (!island.capsulesHovered) capsulesLeaveTimer.restart()
+              if (window.edgeRevealed && !revealHover.hovered) edgeLeaveTimer.restart()
+            }
+          }
           Connections {
             target: root
             function onViewChanged() {
